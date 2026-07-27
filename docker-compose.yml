@@ -1,0 +1,82 @@
+services:
+  catat:
+    image: ghcr.io/sknrendra/catat:${CATAT_TAG:-0.2}
+    restart: unless-stopped
+    environment:
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: https://${CATAT_DOMAIN}
+      NEXT_PUBLIC_BETTER_AUTH_URL: https://${CATAT_DOMAIN}
+      DATABASE_PATH: /app/data/catat.db
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-catat-attachments}
+      RESEND_API_KEY: ${CATAT_RESEND_API_KEY}
+      EMAIL_FROM: ${CATAT_EMAIL_FROM}
+    volumes:
+      - sqlite-data:/app/data
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/9000"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  mingle:
+    image: ghcr.io/sknrendra/mingle:${MINGLE_TAG:-0.1.0}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: sqlite:////app/data/app.db
+      SESSION_SECRET: ${MINGLE_SESSION_SECRET}
+      RESEND_API_KEY: ${MINGLE_RESEND_API_KEY}
+      RESEND_FROM_EMAIL: ${MINGLE_RESEND_FROM_EMAIL}
+      BASE_URL: https://${MINGLE_DOMAIN}
+    volumes:
+      - mingle-data:/app/data
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CATAT_DOMAIN: ${CATAT_DOMAIN}
+      MINGLE_DOMAIN: ${MINGLE_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - catat
+      - mingle
+
+volumes:
+  # Pinned to the volumes already in use by the currently-running catat
+  # deployment so the existing sqlite database and uploaded attachments are
+  # reused in place rather than a fresh, empty volume being created under
+  # this repo's compose project name. `external: true` also means
+  # `docker compose down -v` here can never delete them.
+  sqlite-data:
+    name: catat_sqlite-data
+    external: true
+  minio-data:
+    name: catat_minio-data
+    external: true
+  mingle-data:
+  caddy-data:
+  caddy-config:

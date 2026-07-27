@@ -1,0 +1,7 @@
+{$CATAT_DOMAIN} {
+	reverse_proxy catat:3000
+}
+
+{$MINGLE_DOMAIN} {
+	reverse_proxy mingle:8000
+}

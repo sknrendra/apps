@@ -48,6 +48,16 @@ services:
     volumes:
       - mingle-data:/app/data
 
+  calculator:
+    image: ghcr.io/sknrendra/book-import-calculator:${CALCULATOR_TAG:-0.1.0}
+    environment:
+      SECRET_KEY: ${CALCULATOR_SECRET_KEY:?set SECRET_KEY}
+      ADMIN_PASSWORD: ${CALCULATOR_ADMIN_PASSWORD:?set ADMIN_PASSWORD}
+      COOKIE_SECURE: ${CALCULATOR_COOKIE_SECURE:-0}
+    volumes:
+      - calculator-data:/data
+    restart: unless-stopped
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -57,6 +67,7 @@ services:
     environment:
       CATAT_DOMAIN: ${CATAT_DOMAIN}
       MINGLE_DOMAIN: ${MINGLE_DOMAIN}
+      CALCULATOR_DOMAIN: ${CALCULATOR_DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
@@ -77,6 +88,7 @@ volumes:
   minio-data:
     name: catat_minio-data
     external: true
+  calculator-data:
   mingle-data:
   caddy-data:
   caddy-config:
